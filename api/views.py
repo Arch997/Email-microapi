@@ -54,7 +54,7 @@ class UserCreate(APIView):
         
 
 class PasswordReset(APIView):
-    """Sends a notification if password reset is suuccessful."""
+    """Implement password reset for authenticated user."""
 
     permission_classes = (IsAuthenticated,)
     

@@ -12,10 +12,18 @@ https://docs.djangoproject.com/en/3.0/ref/settings/
 
 import os
 from dotenv import load_dotenv
+import django_redis
+import datetime
+
+
 load_dotenv()
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+# Cache time to live is 15 minutes
+CACHE_TTL = 60 * 15
 
 
 # Quick-start development settings - unsuitable for production
@@ -59,16 +67,33 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+	
 ]
+
+
+CACHES = {
+    "default": {
+	    "BACKEND": "django_redis.cache.RedisCache",
+		"LOCATION": "redis://127.0.0.1:6379/1", 
+		"OPTIONS": {
+		    "CLIENT_CLASS": "django_redis.client.DefaultClient",
+			'MAX_ENTRIES': 1000 # Increase max_entries to 1000 from 300
+			},
+			"KEY_PREFIX": "cache"
+		}
+	}
+	
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework.authentication.TokenAuthentication',
+        # 'rest_framework_jwt.authentication.JSONWebTokenAuthentication',
     ),
     # 'DEFAULT_PERMISSION_CLASSES': (
     #     'rest_framework.permissions.IsAuthenticated',
     # )
 }
+
 
 TOKEN_EXPIRED_AFTER_SECONDS = 86400
 
@@ -94,7 +119,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'send_email_microservice.wsgi.application'
+# WSGI_APPLICATION = 'send_email_microservice.wsgi.application'
 
 
 # Database
@@ -106,6 +131,11 @@ DATABASES = {
         'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
     }
 }
+
+
+INTERNAL_IPS = [
+    '127.0.0.1',
+	]
 
 
 # Password validation
@@ -124,6 +154,14 @@ AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
+]
+
+# Password hashers
+PASSWORD_HASHERS = [
+    'django.contrib.auth.hashers.PBKDF2PasswordHasher',
+    'django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher',
+    'django.contrib.auth.hashers.Argon2PasswordHasher',
+    'django.contrib.auth.hashers.BCryptSHA256PasswordHasher',
 ]
 
 
@@ -145,6 +183,10 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/3.0/howto/static-files/
 
 STATIC_URL = '/static/'
+
+'''# Use CELERY prefix
+CELERY_BROKER_URL = os.environ('REDIS_URL')
+CELERY_RESULT_BACKEND = os.environ('REDIS_URL')'''
 
 
 # #SMTP SERVER SETTINGS SENDGRID
