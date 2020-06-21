@@ -1,13 +1,25 @@
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
+from rest_framework import viewsets
+from rest_framework.decorators import action
+
 from drf_yasg.utils import swagger_auto_schema
 from sendgrid import SendGridAPIClient
-from .serializers import MailSerializer, TemplateMailSerializer, UserSerializer
+from .serializers import MailSerializer, TemplateMailSerializer, UserSerializer, PasswordResetSerializer
 from send_email_microservice.settings import SENDGRID_API_KEY
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authtoken.models import Token
-from datetime import datetime
+from datetime import datetime, timedelta
+from rest_auth.views import PasswordResetView
+
+from django.conf import settings
+from django.core.cache.backends .base import DEFAULT_TIMEOUT
+from django.views.decorators.cache import cache_page
+from django.contrib.auth.models import User
+
+
+# CACHE_TTL = getattr(settings, 'CACHE_TTL', DEFAULT_TIMEOUT)
 
 MAIL_RESPONSES = {
     '200': 'Mail sent successfully.',
@@ -15,6 +27,7 @@ MAIL_RESPONSES = {
     '500': 'An error occurred, could not send email.',
     '401': 'An error occurred. Unauthorized.'
 }
+
 
 class UserCreate(APIView):
     """ 
@@ -24,6 +37,7 @@ class UserCreate(APIView):
         request_body=UserSerializer,
         operation_description="Create an account to generate a token",
     )
+   
     def post(self, request, format='json'):
         serializer = UserSerializer(data=request.data)
         if serializer.is_valid():
@@ -37,6 +51,49 @@ class UserCreate(APIView):
             return Response(resp, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+
+class PasswordReset(APIView):
+    """Sends a notification if password reset is suuccessful."""
+
+    permission_classes = (IsAuthenticated,)
+    
+    @swagger_auto_schema(
+        request_body = PasswordResetSerializer,
+        operation_description = "Change your password",
+    )
+    
+    def patch(self, request, pk=None):
+        serializer = PasswordResetSerializer(User, data=request.data)
+        
+        if serializer.is_valid():
+            # token = Token.objects.create(user=user)
+            serializer.save()
+
+            resp = {'status': 'success', 'data': {'message': 'FPassword changed successfully'} }
+            resp['data']['account_id'] = user.id
+            # resp['data']['access_token'] = token.key
+
+            return Response(resp, status=status.HTTP_205_RESET_CONTENT)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            
+        ''' if not user.check_password(request.data.get('password')):
+            return Response({'password': ['Password is incorrect']}, 
+            status=status.HTTP_400_BAD_REQUEST) 
+        
+        else:
+            resp = {'status': 'success', 'data': {'message': 'Follow the link to change your password.'} }
+            resp['data']['email_id'] = user.email
+            resp['data']['access_token'] = token.key
+        
+            return Response(resp, status=status.HTTP_205_RESET_CONTENT)
+            
+        user.set_password(request.data.get('new_password'))
+        user.save()
+        resp = {'status': 'success', 'data': {'message': 'Password changed successfully'}}
+        return Response(resp, status=status.HTTP_200_OK)    '''     
+
 
 class SendMail(APIView):
 
@@ -47,6 +104,7 @@ class SendMail(APIView):
         operation_description="Sends email as plain text to recipient from sender.",
         responses=MAIL_RESPONSES
     )
+    
     def post(self, request):
         mail_sz = MailSerializer(data=request.data)
         if mail_sz.is_valid():
@@ -57,6 +115,7 @@ class SendMail(APIView):
                 'data': { 'message': 'Incorrect request format.', 'errors': mail_sz.errors}
             }, status=status.HTTP_400_BAD_REQUEST)
 
+            
 class SendMailWithTemplate(APIView):
 
     permission_classes = (IsAuthenticated,)
@@ -66,6 +125,7 @@ class SendMailWithTemplate(APIView):
         operation_description="Sends email as HTML template to recipient from sender.",
         responses=MAIL_RESPONSES
     )
+    
     def post(self, request):
         template_mail_sz = TemplateMailSerializer(data=request.data)
         if template_mail_sz.is_valid():
@@ -76,15 +136,18 @@ class SendMailWithTemplate(APIView):
                 'data': { 'message': 'Incorrect request format.', 'errors': template_mail_sz.errors}
             }, status=status.HTTP_400_BAD_REQUEST)
 
+
+
 class SendScheduledMail(APIView):
 
-    #permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated,)
 
     @swagger_auto_schema(
         request_body=MailSerializer,
         operation_description="Sends email as plain text to recipient from sender.",
         responses=MAIL_RESPONSES
     )
+    
     def post(self, request):
         mail_sz = MailSerializer(data=request.data)
         if mail_sz.is_valid():
@@ -95,6 +158,7 @@ class SendScheduledMail(APIView):
                 'data': { 'message': 'Incorrect request format.', 'errors': mail_sz.errors}
             }, status=status.HTTP_400_BAD_REQUEST)
 
+            
 def send_email(request, options, is_html_template=False, scheduled=False):
 
     def get_email_dict(emails, delimeter):
@@ -113,8 +177,8 @@ def send_email(request, options, is_html_template=False, scheduled=False):
     if(scheduled):
         #get today's date 
         current_time = datetime.now()
-        hours = options['hour']
-        hours_to_add = datetime.timedelta(hours = hours)
+        hours = int(options['hour'])
+        hours_to_add = timedelta(hours = hours)
         later_time = current_time + hours_to_add
         #convert the time to timestamp
         later_timestamp = datetime.timestamp(later_time)
