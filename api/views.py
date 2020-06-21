@@ -78,22 +78,6 @@ class PasswordReset(APIView):
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
             
-        ''' if not user.check_password(request.data.get('password')):
-            return Response({'password': ['Password is incorrect']}, 
-            status=status.HTTP_400_BAD_REQUEST) 
-        
-        else:
-            resp = {'status': 'success', 'data': {'message': 'Follow the link to change your password.'} }
-            resp['data']['email_id'] = user.email
-            resp['data']['access_token'] = token.key
-        
-            return Response(resp, status=status.HTTP_205_RESET_CONTENT)
-            
-        user.set_password(request.data.get('new_password'))
-        user.save()
-        resp = {'status': 'success', 'data': {'message': 'Password changed successfully'}}
-        return Response(resp, status=status.HTTP_200_OK)    '''     
-
 
 class SendMail(APIView):
 
