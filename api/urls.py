@@ -5,5 +5,6 @@ urlpatterns = [
     path('sendmail', views.SendMail.as_view()),
     path('sendmailwithtemplate', views.SendMailWithTemplate.as_view()),
     path('register', views.UserCreate.as_view(), name='account-create'),
-    path('sendscheduledmail', views.SendScheduledMail.as_view())
+    path('sendscheduledmail', views.SendScheduledMail.as_view()),
+    path('resetpassword', views.Passwordreset.as_view())
 ]
