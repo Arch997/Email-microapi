@@ -3,11 +3,14 @@ from rest_framework import status
 from rest_framework.views import APIView
 from drf_yasg.utils import swagger_auto_schema
 from sendgrid import SendGridAPIClient
-from .serializers import MailSerializer, TemplateMailSerializer, UserSerializer
+from .serializers import MailSerializer, TemplateMailSerializer, UserSerializer, PasswordResetSerializer
 from send_email_microservice.settings import SENDGRID_API_KEY
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authtoken.models import Token
-from datetime import datetime
+from datetime import datetime, timedelta
+from django.contrib.auth.models import User
+
+
 
 MAIL_RESPONSES = {
     '200': 'Mail sent successfully.',
@@ -37,6 +40,33 @@ class UserCreate(APIView):
             return Response(resp, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class PasswordReset(APIView):
+    """Implement password reset for authenticated user."""
+
+    permission_classes = (IsAuthenticated,)
+    
+    @swagger_auto_schema(
+        request_body = PasswordResetSerializer,
+        operation_description = "Change your password",
+    )
+    
+    def patch(self, request, pk=None):
+        serializer = PasswordResetSerializer(User, data=request.data)
+        
+        if serializer.is_valid():
+            # token = Token.objects.create(user=user)
+            serializer.save()
+
+            resp = {'status': 'success', 'data': {'message': 'FPassword changed successfully'} }
+            resp['data']['account_id'] = user.id
+            # resp['data']['access_token'] = token.key
+
+            return Response(resp, status=status.HTTP_205_RESET_CONTENT)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class SendMail(APIView):
 
@@ -95,6 +125,7 @@ class SendScheduledMail(APIView):
                 'data': { 'message': 'Incorrect request format.', 'errors': mail_sz.errors}
             }, status=status.HTTP_400_BAD_REQUEST)
 
+
 def send_email(request, options, is_html_template=False, scheduled=False):
 
     def get_email_dict(emails, delimeter):
@@ -113,8 +144,8 @@ def send_email(request, options, is_html_template=False, scheduled=False):
     if(scheduled):
         #get today's date 
         current_time = datetime.now()
-        hours = options['hour']
-        hours_to_add = datetime.timedelta(hours = hours)
+        hours = int(options['hour'])
+        hours_to_add = timedelta(hours = hours)
         later_time = current_time + hours_to_add
         #convert the time to timestamp
         later_timestamp = datetime.timestamp(later_time)
@@ -161,6 +192,3 @@ def send_email(request, options, is_html_template=False, scheduled=False):
         'status': 'success',
         'data': { 'message': 'Mail sent successfully.'}
     }, status=status.HTTP_200_OK)
-
-
-
